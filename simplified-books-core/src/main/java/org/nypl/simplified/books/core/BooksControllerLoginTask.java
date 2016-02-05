@@ -19,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -83,38 +84,44 @@ final class BooksControllerLoginTask implements Runnable,
      * server and seeing whether or not it rejects the given credentials.
      */
 
-    final URI loans_uri = this.config.getCurrentLoansURI();
-
-    BooksControllerLoginTask.LOG.debug(
-      "attempting login on {}", loans_uri);
-
     final AccountBarcode user = this.credentials.getUser();
     final AccountPIN pass = this.credentials.getPassword();
     final HTTPAuthType auth =
       new HTTPAuthBasic(user.toString(), pass.toString());
-    final HTTPResultType<Unit> r = this.http.head(Option.some(auth), loans_uri);
+
+    URI auth_uri = this.config.getCurrentLoansURI();
+    HTTPResultType<InputStream> r;
+    if (this.adobe_drm.isSome()) {
+      auth_uri = this.config.getCurrentRootFeedURI().resolve("AdobeAuth/authdata");
+      r = this.http.get(Option.some(auth), auth_uri, 0);
+    } else {
+      r = this.http.head(Option.some(auth), auth_uri);
+    }
+
+    BooksControllerLoginTask.LOG.debug(
+      "attempting login on {}", auth_uri);
 
     r.matchResult(
-      new HTTPResultMatcherType<Unit, Unit, UnreachableCodeException>()
+      new HTTPResultMatcherType<InputStream, Unit, UnreachableCodeException>()
       {
         @Override
-        public Unit onHTTPError(final HTTPResultError<Unit> e)
+        public Unit onHTTPError(final HTTPResultError<InputStream> e)
         {
           BooksControllerLoginTask.this.onHTTPServerReturnedError(e);
           return Unit.unit();
         }
 
         @Override
-        public Unit onHTTPException(final HTTPResultException<Unit> e)
+        public Unit onHTTPException(final HTTPResultException<InputStream> e)
         {
           BooksControllerLoginTask.this.onHTTPException(e);
           return Unit.unit();
         }
 
         @Override
-        public Unit onHTTPOK(final HTTPResultOKType<Unit> e)
+        public Unit onHTTPOK(final HTTPResultOKType<InputStream> e)
         {
-          BooksControllerLoginTask.this.onHTTPServerAcceptedCredentials();
+          BooksControllerLoginTask.this.onHTTPServerAcceptedCredentials(e.getValue());
           return Unit.unit();
         }
       });
@@ -127,7 +134,7 @@ final class BooksControllerLoginTask implements Runnable,
       Option.some((Throwable) ex), ex.getMessage());
   }
 
-  private void onHTTPServerReturnedError(final HTTPResultError<Unit> e)
+  private void onHTTPServerReturnedError(final HTTPResultError<?> e)
   {
     final int code = e.getStatus();
     switch (code) {
@@ -141,7 +148,8 @@ final class BooksControllerLoginTask implements Runnable,
     }
   }
 
-  private void onHTTPServerAcceptedCredentials()
+  private void onHTTPServerAcceptedCredentials(
+    final InputStream data)
   {
     /**
      * If an Adobe DRM implementation is available, activate the device
@@ -150,11 +158,18 @@ final class BooksControllerLoginTask implements Runnable,
      */
 
     if (this.adobe_drm.isSome()) {
-
+      final byte[] buffer = new byte[1024];
+      try {
+        data.read(buffer, 0, 1024);
+      } catch (IOException e) {
+        BooksControllerLoginTask.LOG.warn("Failed to read token response byte stream");
+      }
+      final String token = new String(buffer);
       BooksControllerDeviceActivationTask activation_task =
         new BooksControllerDeviceActivationTask(this.adobe_drm,
           this.credentials,
-          this.accounts_database)
+          this.accounts_database,
+          token)
         {
           @Override public void onActivationsCount(final int count)
           {

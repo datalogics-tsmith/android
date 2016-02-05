@@ -29,6 +29,7 @@ public class BooksControllerDeviceActivationTask implements Runnable,
   private final OptionType<AdobeAdeptExecutorType> adobe_drm;
   private final AccountCredentials                 credentials;
   private final AccountsDatabaseType               accounts_database;
+  private final String                             token;
 
   private static final Logger LOG;
 
@@ -39,12 +40,14 @@ public class BooksControllerDeviceActivationTask implements Runnable,
   BooksControllerDeviceActivationTask(
     final OptionType<AdobeAdeptExecutorType> in_adobe_drm,
     final AccountCredentials                 in_credentials,
-    final AccountsDatabaseType               in_accounts_database
+    final AccountsDatabaseType               in_accounts_database,
+    final String                             in_token
   )
   {
     this.adobe_drm = in_adobe_drm;
     this.credentials = in_credentials;
     this.accounts_database = in_accounts_database;
+    this.token = in_token;
   }
 
   @Override
@@ -56,7 +59,6 @@ public class BooksControllerDeviceActivationTask implements Runnable,
       final AdobeAdeptExecutorType adobe_exec = some.get();
 
       final AccountBarcode user = this.credentials.getUser();
-      final AccountPIN pass = this.credentials.getPassword();
       final OptionType<AdobeVendorID> vendor_opt = this.credentials.getAdobeVendor();
 
       vendor_opt.accept(
@@ -78,11 +80,11 @@ public class BooksControllerDeviceActivationTask implements Runnable,
                 public void executeWith(final AdobeAdeptConnectorType c)
                 {
                   c.discardDeviceActivations();
-                  c.activateDevice(
+                  c.activateDeviceToken(
                     BooksControllerDeviceActivationTask.this,
                     s.get(),
                     user.toString(),
-                    pass.toString());
+                    BooksControllerDeviceActivationTask.this.token);
                 }
               });
             return Unit.unit();

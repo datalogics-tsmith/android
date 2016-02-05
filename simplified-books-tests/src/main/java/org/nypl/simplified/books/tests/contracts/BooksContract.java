@@ -187,7 +187,7 @@ public final class BooksContract implements BooksContractType
         }
       }
 
-      @Override public HTTPResultType<Unit> head(
+      @Override public HTTPResultType<InputStream> head(
         final OptionType<HTTPAuthType> auth_opt,
         final URI uri)
       {
@@ -195,11 +195,11 @@ public final class BooksContract implements BooksContractType
           return this.headLoans(auth_opt);
         }
 
-        return new HTTPResultOK<Unit>(
-          "OK", 200, Unit.unit(), 1L, empty_headers, 0L);
+        return new HTTPResultOK<InputStream>(
+          "OK", 200, new ByteArrayInputStream(new byte[0]), 1L, empty_headers, 0L);
       }
 
-      private HTTPResultType<Unit> headLoans(
+      private HTTPResultType<InputStream> headLoans(
         final OptionType<HTTPAuthType> auth_opt)
       {
         if (auth_opt.isNone()) {
@@ -210,7 +210,7 @@ public final class BooksContract implements BooksContractType
         final HTTPAuthType auth = some.get();
         try {
           return auth.matchAuthType(
-            new HTTPAuthMatcherType<HTTPResultType<Unit>, IOException>()
+            new HTTPAuthMatcherType<HTTPResultType<InputStream>, IOException>()
             {
               private boolean isAuthorized(
                 final HTTPAuthBasic b)
@@ -220,7 +220,7 @@ public final class BooksContract implements BooksContractType
                 return ok;
               }
 
-              @Override public HTTPResultType<Unit> onAuthBasic(
+              @Override public HTTPResultType<InputStream> onAuthBasic(
                 final HTTPAuthBasic b)
                 throws IOException
               {
@@ -229,8 +229,8 @@ public final class BooksContract implements BooksContractType
                   return unauthorized();
                 }
 
-                return new HTTPResultOK<Unit>(
-                  "OK", 200, Unit.unit(), 1L, empty_headers, 0L);
+                return new HTTPResultOK<InputStream>(
+                  "OK", 200, new ByteArrayInputStream(new byte[0]), 1L, empty_headers, 0L);
               }
             });
         } catch (final IOException e) {
@@ -272,11 +272,11 @@ public final class BooksContract implements BooksContractType
         return new HTTPResultException<InputStream>(uri, new IOException());
       }
 
-      @Override public HTTPResultType<Unit> head(
+      @Override public HTTPResultType<InputStream> head(
         final OptionType<HTTPAuthType> auth,
         final URI uri)
       {
-        return new HTTPResultException<Unit>(uri, new IOException());
+        return new HTTPResultException<InputStream>(uri, new IOException());
       }
 
       @Override

@@ -237,6 +237,11 @@ public final class BooksController implements BooksType
         this.syncing));
   }
 
+  // This method is currently not used, and doesn't work, but it's
+  // possible it will be useful in the future. To make it work, the
+  // part of the login task that gets a login token will have to be
+  // moved into the activation task, so that a token isn't required
+  // here.
   @Override public void accountActivateDevice()
   {
     final OptionType<AccountCredentials> credentials_opt = this.accounts_database.accountGetCredentials();
@@ -245,7 +250,8 @@ public final class BooksController implements BooksType
       final BooksControllerDeviceActivationTask activation_task = new BooksControllerDeviceActivationTask(
         this.adobe_drm,
         credentials_some.get(),
-        this.accounts_database
+        this.accounts_database,
+        ""
       );
       this.submitRunnable(activation_task);
     }
